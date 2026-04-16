@@ -1,0 +1,6 @@
+{
+  "name": "Smart Seat Planer",
+  "description": "App der Schülerfirma zur automatisierten und optimalen Sitzplatzverteilung",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}

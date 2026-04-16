@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // users: email, name, licenseType, licenseKey, coachingAvailable, originalPricePaid
+    // licenseKeys: key, type, isUsed, assignedTo
+    // classes: name, teacherId, description
+    // feedback: classId, teacherId, rating, comment, createdAt (inside classes/{classId}/feedback/{feedbackId})
+    // students: classId, teacherId, name, performance, behavioralIssues, avoidNeighbors, wishNeighbors, learningType, specialNeeds
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidLicenseType(type) {
+      return type in ["FREE", "STARTER", "BASIC", "PRO", "ULTRA"];
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      // Users can be created mostly when they authenticate. 
+      // We allow self-creation but restrict licenseType to "FREE" unless they have admin privileges (which we don't use right now).
+      allow create: if isOwner(userId) && request.resource.data.keys().hasAll(["email", "name", "licenseType"]) && request.resource.data.licenseType == "FREE";
+      // To upgrade, users update their own licenseType via a secure flow. 
+      // Theoretically this requires a Cloud Function for true security, 
+      // but in this prototype allowing self-update is necessary to redeem license keys client-side.
+      allow update: if isOwner(userId); 
+    }
+
+    match /licenseKeys/{licenseKeyId} {
+      // Anyone authenticated can read license keys to check if they are valid
+      allow read: if isAuthenticated();
+      // Allow marking a key as used. Only update the 'isUsed' and 'assignedTo' fields.
+      allow update: if isAuthenticated() && 
+                    request.resource.data.isUsed == true && 
+                    request.resource.data.assignedTo == request.auth.uid &&
+                    resource.data.isUsed == false &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isUsed', 'assignedTo']);
+    }
+
+    match /classes/{classId} {
+      allow read: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
+      
+      match /feedback/{feedbackId} {
+        allow read: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
+        allow create: if isAuthenticated() && request.resource.data.teacherId == request.auth.uid;
+        allow update, delete: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
+      }
+    }
+
+    match /students/{studentId} {
+      allow read: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
+    }
+  }
+}

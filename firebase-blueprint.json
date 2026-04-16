@@ -1,0 +1,180 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A teacher using the Smart Seat Planer",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's email"
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name"
+        },
+        "licenseType": {
+          "type": "string",
+          "enum": ["FREE", "STARTER", "BASIC", "PRO", "ULTRA"],
+          "description": "The type of license the user holds"
+        },
+        "licenseKey": {
+          "type": "string",
+          "description": "The license key applied to the account"
+        },
+        "coachingAvailable": {
+          "type": "number",
+          "description": "Number of coaching sessions available"
+        },
+        "originalPricePaid": {
+          "type": "number",
+          "description": "The amount paid for the current license"
+        }
+      },
+      "required": ["email", "name", "licenseType"]
+    },
+    "LicenseKey": {
+      "title": "LicenseKey",
+      "description": "A license key that can be redeemed for an upgrade",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["STARTER", "BASIC", "PRO", "ULTRA"]
+        },
+        "isUsed": {
+          "type": "boolean"
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "UID of the user who redeemed the key"
+        }
+      },
+      "required": ["key", "type", "isUsed"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "A class managed by a teacher",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "teacherId": {
+          "type": "string",
+          "description": "UID of the teacher"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": ["name", "teacherId"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A student in a class",
+      "type": "object",
+      "properties": {
+        "classId": {
+          "type": "string"
+        },
+        "teacherId": {
+          "type": "string",
+          "description": "UID of the teacher to enforce RLS"
+        },
+        "name": {
+          "type": "string"
+        },
+        "performance": {
+          "type": "number",
+          "enum": [1, 2, 3],
+          "description": "1 = weak, 2 = average, 3 = strong"
+        },
+        "behavioralIssues": {
+          "type": "boolean"
+        },
+        "avoidNeighbors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of student IDs to avoid sitting next to"
+        },
+        "wishNeighbors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of student IDs they wish to sit next to"
+        },
+        "learningType": {
+          "type": "string",
+          "enum": ["visual", "auditory", "kinesthetic"],
+          "description": "Preferred learning style"
+        },
+        "specialNeeds": {
+          "type": "string",
+          "description": "Such as ADHS, Sehschwäche, etc."
+        }
+      },
+      "required": ["classId", "teacherId", "name", "performance", "behavioralIssues"]
+    },
+    "SeatPlanFeedback": {
+      "title": "SeatPlanFeedback",
+      "description": "Feedback on generated seat plans",
+      "type": "object",
+      "properties": {
+        "classId": {
+          "type": "string"
+        },
+        "teacherId": {
+          "type": "string"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Star rating 1-5"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["classId", "teacherId", "rating", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "User"
+      },
+      "description": "User profiles"
+    },
+    "/licenseKeys/{licenseKeyId}": {
+      "schema": {
+        "$ref": "LicenseKey"
+      },
+      "description": "License keys for upgrading"
+    },
+    "/classes/{classId}": {
+      "schema": {
+        "$ref": "Class"
+      },
+      "description": "Classes belonging to teachers"
+    },
+    "/classes/{classId}/feedback/{feedbackId}": {
+      "schema": {
+        "$ref": "SeatPlanFeedback"
+      },
+      "description": "Feedback for seat plans generated for this class"
+    },
+    "/students/{studentId}": {
+      "schema": {
+        "$ref": "Student"
+      },
+      "description": "Students belonging to a class"
+    }
+  }
+}
