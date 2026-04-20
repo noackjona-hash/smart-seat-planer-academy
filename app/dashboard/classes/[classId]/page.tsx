@@ -370,10 +370,10 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 items-start flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden min-h-0">
         
         {/* Rules/Left Panel */}
-        <div className="lg:col-span-1 border-r border-slate-200 bg-white p-6 flex flex-col gap-5 h-full">
+        <div className="lg:col-span-1 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white p-4 lg:p-6 flex flex-col gap-5 h-auto lg:h-full max-h-[50vh] lg:max-h-none overflow-y-auto">
           <div>
             <h3 className="font-semibold text-slate-900 text-sm mb-3 flex items-center justify-between">
               Schülerliste
@@ -398,7 +398,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                <select 
                   value={filterPerf}
                   onChange={(e) => setFilterPerf(e.target.value === 'all' ? 'all' : Number(e.target.value) as 1|2|3)}
-                  className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:ring-1 focus:ring-blue-500 outline-none text-slate-700 bg-slate-50"
+                  className="w-full text-xs border border-slate-200 rounded px-2 min-h-[44px] lg:min-h-[auto] py-1.5 focus:ring-1 focus:ring-blue-500 outline-none text-slate-700 bg-slate-50"
                >
                   <option value="all">Leistung: Alle</option>
                   <option value="1">Nur Schwach</option>
@@ -407,16 +407,16 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                </select>
             </div>
 
-            <div className="space-y-2 max-h-[40vh] overflow-auto">
+            <div className="space-y-2">
               {students
                 .filter(s => filterPerf === 'all' || s.performance === filterPerf)
                 .map(s => (
                 <div key={s.id} className="p-2 border border-slate-200 rounded-md flex items-center justify-between hover:border-slate-300 group transition px-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 w-full overflow-hidden">
                     <div className="w-3 h-3 bg-slate-100 rounded flex-shrink-0"></div>
-                    <div>
-                      <div className="font-semibold text-slate-800 text-xs">{s.name}</div>
-                      <div className="text-[0.65rem] text-slate-500 mt-0.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-800 text-xs truncate">{s.name}</div>
+                      <div className="text-[0.65rem] text-slate-500 mt-0.5 truncate">
                         {s.performance === 3 ? "Stark" : s.performance === 1 ? "Schwach" : "Neutral"}
                         {s.behavioralIssues && " | Stört"}
                         {s.learningType && ` | ${s.learningType}`}
@@ -424,11 +424,11 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition gap-1">
-                    <button onClick={() => setEditingStudent({...s})} className="text-slate-300 hover:text-blue-500 p-1">
+                  <div className="flex items-center opacity-100 lg:opacity-0 group-hover:opacity-100 transition gap-1 ml-2">
+                    <button onClick={() => setEditingStudent({...s})} className="text-slate-400 hover:text-blue-500 p-2 lg:p-1">
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => removeStudent(s.id)} className="text-slate-300 hover:text-red-500 p-1">
+                    <button onClick={() => removeStudent(s.id)} className="text-slate-400 hover:text-red-500 p-2 lg:p-1">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -440,12 +440,12 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
           <div className="mt-auto border-2 border-dashed border-blue-500 rounded-xl p-4 bg-blue-50 text-center cursor-pointer hover:bg-blue-100 transition" onClick={handleMagicImport}>
              <span className="text-2xl block mb-2">📸</span>
              <strong className="text-sm text-blue-600 block">Magic-Photo Import</strong>
-             <p className="text-[0.7rem] text-slate-500 mt-1">Wunschzettel-Foto hochladen (OCR)</p>
+             <p className="text-[0.7rem] text-slate-500 mt-1">Wunschzettel-Foto hochladen</p>
           </div>
         </div>
 
         {/* Right Col: Seat Planner */}
-        <div className="lg:col-span-3 bg-slate-50 p-4 lg:p-6 flex flex-col overflow-auto h-[60vh] lg:h-full">
+        <div className="lg:col-span-3 bg-slate-50 p-4 lg:p-6 flex flex-col overflow-auto h-[60vh] min-h-[500px] lg:h-full lg:min-h-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 lg:mb-6">
             <div className="flex items-center gap-4">
               {isSaving && (
