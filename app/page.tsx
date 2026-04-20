@@ -1,13 +1,35 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { Users, LayoutDashboard, Star, Check } from "lucide-react";
 
 export default function LandingPage() {
-  const { user, loginWithGoogle, isLoading } = useAuth();
+  const { user, loginWithGoogle, loginWithEmail, registerWithEmail, isLoading, authError, clearAuthError } = useAuth();
   const router = useRouter();
+  
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('REGISTER');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingAuth(true);
+    try {
+      if (authMode === 'LOGIN') {
+        await loginWithEmail(email, password);
+      } else {
+        await registerWithEmail(email, password, name);
+      }
+    } catch (error) {
+      // Handled in Context
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -24,7 +46,31 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white relative">
+      {authError && (
+        <div className="fixed top-0 inset-x-0 z-50 p-4 bg-rose-500 text-white flex flex-col md:flex-row items-center justify-center gap-4 text-sm shadow-md font-medium animate-in slide-in-from-top-4">
+          <span>
+            {authError === 'popup-blocked' 
+              ? "Login blockiert! Dein Browser unterdrückt das Google-Popup." 
+              : `Fehler: ${authError}`}
+          </span>
+          {authError === 'popup-blocked' && (
+            <a 
+              href={window.location.href} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={() => clearAuthError()}
+              className="bg-white text-rose-600 px-4 py-1.5 rounded-full font-bold shadow-sm hover:bg-rose-50 transition"
+            >
+              App in neuem Tab öffnen
+            </a>
+          )}
+          <button onClick={() => clearAuthError()} className="ml-4 opacity-80 hover:opacity-100">
+            Schließen
+          </button>
+        </div>
+      )}
+
       {/* Navbar */}
       <nav className="border-b border-slate-200 p-4 shrink-0 px-8 flex justify-between items-center max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-2 text-blue-600 font-bold text-xl">
@@ -32,7 +78,10 @@ export default function LandingPage() {
           <span>Smart Seat Planer</span>
         </div>
         <button 
-          onClick={loginWithGoogle}
+          onClick={() => {
+            setAuthMode('LOGIN');
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          }}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition"
         >
           Login / Registrieren
@@ -55,7 +104,10 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button 
-              onClick={loginWithGoogle}
+              onClick={() => {
+                setAuthMode('REGISTER');
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-md font-bold text-lg shadow-sm transition flex items-center justify-center gap-2"
             >
               Kostenlos starten
@@ -74,21 +126,70 @@ export default function LandingPage() {
           </ul>
         </div>
         
-        <div className="flex-1 relative w-full max-w-lg">
-          <div className="absolute inset-0 bg-slate-100 rounded-xl transform rotate-3 border border-slate-200"></div>
-          <div className="relative bg-white rounded-xl shadow-sm border border-slate-200 p-8 grid grid-cols-2 gap-4">
-            {/* Mockup UI representation */}
-            <div className="col-span-2 h-12 bg-slate-50 rounded mb-4 flex items-center px-4 gap-3 border border-slate-200">
-               <div className="w-3 h-3 rounded bg-red-400"></div>
-               <div className="w-3 h-3 rounded bg-amber-400"></div>
-               <div className="w-3 h-3 rounded bg-green-400"></div>
-            </div>
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="aspect-video bg-blue-50/50 border border-blue-100 rounded flex items-center justify-center flex-col gap-2">
-                <Users className="text-blue-300 w-8 h-8" />
-                <div className="w-16 h-2 bg-blue-200 rounded-full"></div>
+        <div className="flex-1 w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">
+              {authMode === 'LOGIN' ? 'Willkommen zurück' : 'Jetzt starten'}
+            </h2>
+            
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              {authMode === 'REGISTER' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Max Mustermann"
+                  />
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="name@schule.de"
+                />
               </div>
-            ))}
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Passwort</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="••••••••"
+                  minLength={6}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingAuth}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
+              >
+                {isSubmittingAuth ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : authMode === 'LOGIN' ? 'Anmelden' : 'Konto erstellen'}
+              </button>
+            </form>
+
+            <div className="text-center text-sm text-slate-600 mt-6 pt-4 border-t border-slate-100">
+              {authMode === 'LOGIN' ? (
+                <>Neu hier? <button type="button" onClick={() => setAuthMode('REGISTER')} className="text-blue-600 font-bold hover:underline">Registrieren</button></>
+              ) : (
+                <>Bereits ein Konto? <button type="button" onClick={() => setAuthMode('LOGIN')} className="text-blue-600 font-bold hover:underline">Anmelden</button></>
+              )}
+            </div>
           </div>
         </div>
       </main>

@@ -10,6 +10,7 @@ import { Plus, Trash2, Camera, Download, LayoutTemplate, Settings2, ShieldAlert,
 import { useRouter } from "next/navigation";
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor, DragEndEvent, useDroppable, useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { generateAISeatingPlan } from "@/lib/aiSeating";
 
 function DroppableSlot({ row, col, children }: { row: number, col: number, children: React.ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({
@@ -78,6 +79,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
   const [feedbackComment, setFeedbackComment] = useState("");
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -188,6 +190,26 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
     setFeedbackSuccess(false);
     setRating(0);
     setFeedbackComment("");
+  };
+
+  const handleGenerateAI = async () => {
+    setIsGeneratingAI(true);
+    try {
+      const updatedStudentsList = await generateAISeatingPlan(students, rows, cols);
+      updatedStudentsList.forEach(s => {
+         const original = students.find(orig => orig.id === s.id);
+         if (!original || original.seatRow !== s.seatRow || original.seatCol !== s.seatCol) {
+            queueStudentUpdate(s.id, { seatRow: s.seatRow ?? null, seatCol: s.seatCol ?? null });
+         }
+      });
+      setFeedbackSuccess(false);
+      setRating(0);
+      setFeedbackComment("");
+    } catch (error) {
+      alert("Fehler bei der KI-Generierung. Bitte versuche es erneut.");
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   const handleUpdateStudent = async (e: React.FormEvent) => {
@@ -441,9 +463,19 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                 <input type="number" min={1} max={10} value={cols} onChange={e => setCols(Number(e.target.value))} className="w-14 min-h-[44px] sm:min-h-[auto] border border-slate-200 rounded px-2 py-1 text-center text-sm font-medium" />
               </div>
             </div>
-            <button onClick={handleGenerate} className="min-h-[44px] sm:min-h-[auto] bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold px-4 py-1.5 text-sm rounded transition shadow-sm w-full sm:w-auto">
-              Sitzplan generieren
-            </button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button onClick={handleGenerate} className="flex-1 sm:flex-none min-h-[44px] sm:min-h-[auto] bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold px-4 py-1.5 text-sm rounded transition shadow-sm w-full sm:w-auto">
+                Sitzplan generieren
+              </button>
+              <button onClick={handleGenerateAI} disabled={isGeneratingAI} className="flex-1 sm:flex-none min-h-[44px] sm:min-h-[auto] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-4 py-1.5 text-sm rounded transition shadow-sm w-full sm:w-auto flex items-center justify-center gap-2">
+                {isGeneratingAI ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <Star className="w-4 h-4" />
+                )}
+                KI Algorithmus
+              </button>
+            </div>
           </div>
 
           <div id="seating-chart" className="flex-1 overflow-auto bg-white border border-slate-200 rounded-xl p-4 lg:p-8 relative min-h-[300px]">

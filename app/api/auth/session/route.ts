@@ -3,16 +3,13 @@ import { createToken, verifyToken } from '@/lib/jwt';
 
 export async function POST(request: Request) {
   try {
-    const { token } = await request.json();
+    const body = await request.json();
+    const { token, uid, email } = body;
     if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
 
     // In a real app we would verify the Firebase token here via Admin SDK.
-    // For this demonstration, we'll assume the client sent the valid uid in the body 
-    // or we decode it. Since we don't have the admin sdk we will create a session JWT.
-    const { uid, email } = await request.json().catch(() => ({uid: 'unknown', email: ''})) || {};
-    
-    // Create our own JWT Session and Store it as a HttpOnly cookie
-    const sessionJwt = await createToken({ uid, email }, '7d');
+    // For this demonstration, we create a session JWT.
+    const sessionJwt = await createToken({ uid: uid || 'unknown', email: email || '' }, '7d');
 
     const response = NextResponse.json({ success: true }, { status: 200 });
     
