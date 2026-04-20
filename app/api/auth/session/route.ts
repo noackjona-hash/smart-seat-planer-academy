@@ -18,8 +18,8 @@ export async function POST(request: Request) {
       name: 'auth_jwt_session',
       value: sessionJwt,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true, // MUST be true for SameSite 'none'
+      sameSite: 'none', // MUST be 'none' for iframe compatibility
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
