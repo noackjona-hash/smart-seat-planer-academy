@@ -71,11 +71,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
         });
         
+        // Synchronize with our custom JWT cookie session for middleware protection
+        currentUser.getIdToken().then(token => {
+           fetch('/api/auth/session', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ token, uid: currentUser.uid, email: currentUser.email })
+           }).catch(console.error);
+        });
+
         setIsLoading(false);
         return () => unsubProfile();
       } else {
         setProfile(null);
         setIsLoading(false);
+        fetch('/api/auth/session', { method: 'DELETE' }).catch(console.error);
       }
     });
 

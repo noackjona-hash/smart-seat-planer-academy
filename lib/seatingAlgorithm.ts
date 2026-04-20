@@ -1,5 +1,7 @@
 export interface Student {
   id: string;
+  classId?: string;
+  teacherId?: string;
   name: string;
   performance: number; // 1 = weak, 2 = average, 3 = strong
   behavioralIssues: boolean;
@@ -7,6 +9,8 @@ export interface Student {
   wishNeighbors: string[]; // student IDs
   learningType?: 'visual' | 'auditory' | 'kinesthetic';
   specialNeeds?: string;
+  seatRow?: number | null;
+  seatCol?: number | null;
 }
 
 export interface Seat {
@@ -15,39 +19,32 @@ export interface Seat {
   studentId: string | null;
 }
 
-export function generateSeatingPlan(students: Student[], rows: number, cols: number): Seat[] {
-  // Initialize empty grid
-  const grid: Seat[] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      grid.push({ row: r, col: c, studentId: null });
-    }
-  }
+export function generateSeatingPlan(students: Student[], rows: number, cols: number): Student[] {
+  // Initialize empty grid to track occupied seats
+  const occupied: (string | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
 
-  if (students.length === 0) return grid;
+  if (students.length === 0) return students;
 
-  // Extremely basic heuristic for seating (not purely optimal, just a decent attempt)
-  // 1. Separate behavioral issues
-  // 2. Pair strong (3) and weak (1) if possible
-  // 3. Respect avoid/wish
+  // Clear existing seats
+  const updatedStudents: Student[] = students.map(s => ({ ...s, seatRow: null, seatCol: null }));
 
-  let unseated = [...students];
+  // Extremely basic heuristic for seating
+  let unseated = [...updatedStudents];
   
-  // Sort by 'difficulty to seat': e.g., behavioral issues first, then strong constraints
+  // Sort by 'difficulty to seat'
   unseated.sort((a, b) => {
     let scoreA = (a.behavioralIssues ? 10 : 0) + a.avoidNeighbors.length + a.wishNeighbors.length;
     let scoreB = (b.behavioralIssues ? 10 : 0) + b.avoidNeighbors.length + b.wishNeighbors.length;
     return scoreB - scoreA;
   });
 
-  const getNeighbors = (r: number, c: number, currentGrid: typeof grid) => {
+  const getNeighbors = (r: number, c: number) => {
     const neighbors: (string | null)[] = [];
     const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (const [dr, dc] of dirs) {
       const nr = r + dr, nc = c + dc;
       if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-        const seat = currentGrid.find(s => s.row === nr && s.col === nc);
-        if (seat?.studentId) neighbors.push(seat.studentId);
+        if (occupied[nr][nc]) neighbors.push(occupied[nr][nc]);
       }
     }
     return neighbors;
@@ -55,13 +52,15 @@ export function generateSeatingPlan(students: Student[], rows: number, cols: num
 
   for (let c = 0; c < unseated.length; c++) {
     const student = unseated[c];
-    let bestSeatIndex = -1;
+    let bestR = -1;
+    let bestC = -1;
     let bestScore = -Infinity;
 
-    for (let i = 0; i < grid.length; i++) {
-        if (grid[i].studentId !== null) continue;
+    for (let r = 0; r < rows; r++) {
+      for (let col = 0; col < cols; col++) {
+        if (occupied[r][col] !== null) continue;
 
-        const neighbors = getNeighbors(grid[i].row, grid[i].col, grid);
+        const neighbors = getNeighbors(r, col);
         let currentScore = 0;
         let conflict = false;
 
@@ -95,27 +94,41 @@ export function generateSeatingPlan(students: Student[], rows: number, cols: num
 
         if (conflict) continue;
 
-        // Front row preference for weak or behavioral?
-        // simple test: rows closer to 0 get slight preference for behavioral
+        // Front row preference for behavioral?
         if (student.behavioralIssues) {
-            currentScore += (rows - grid[i].row) * 5;
+            currentScore += (rows - r) * 5;
         }
 
         if (currentScore > bestScore) {
             bestScore = currentScore;
-            bestSeatIndex = i;
+            bestR = r;
+            bestC = col;
         }
+      }
     }
 
     // Fallback if no valid seat without conflicts find any empty seat
-    if (bestSeatIndex === -1) {
-        bestSeatIndex = grid.findIndex(s => s.studentId === null);
+    if (bestR === -1) {
+      for (let r = 0; r < rows; r++) {
+        for (let col = 0; col < cols; col++) {
+           if (occupied[r][col] === null) {
+              bestR = r;
+              bestC = col;
+              break;
+           }
+        }
+        if (bestR !== -1) break;
+      }
     }
 
-    if (bestSeatIndex !== -1) {
-        grid[bestSeatIndex].studentId = student.id;
+    if (bestR !== -1) {
+        occupied[bestR][bestC] = student.id;
+        const studentIndex = updatedStudents.findIndex(s => s.id === student.id);
+        if (studentIndex > -1) {
+           updatedStudents[studentIndex] = { ...updatedStudents[studentIndex], seatRow: bestR, seatCol: bestC };
+        }
     }
   }
 
-  return grid;
+  return updatedStudents;
 }

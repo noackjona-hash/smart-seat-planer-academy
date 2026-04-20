@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/firebase";
-import { collection, query, where, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, addDoc, onSnapshot, deleteDoc, doc, updateDoc, writeBatch } from "firebase/firestore";
 import { Student, generateSeatingPlan, Seat } from "@/lib/seatingAlgorithm";
 import { exportToPDF } from "@/lib/pdfExport";
 import { Plus, Trash2, Camera, Download, LayoutTemplate, Settings2, ShieldAlert, Users, Edit, Star, Check, X, Smartphone } from "lucide-react";
@@ -51,8 +51,13 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
   const resolvedParams = use(params);
   const classId = resolvedParams.classId;
   const { user, profile } = useAuth();
+  const [serverStudents, setServerStudents] = useState<Student[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [grid, setGrid] = useState<Seat[]>([]);
+  const pendingUpdatesRef = useRef<Record<string, { seatRow: number | null, seatCol: number | null }>>({});
+  const debouncedSaveRef = useRef<NodeJS.Timeout | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasGrid, setHasGrid] = useState(false);
+  const [filterPerf, setFilterPerf] = useState<'all' | 1 | 2 | 3>('all');
   
   // Grid config
   const [rows, setRows] = useState(4);
@@ -80,12 +85,64 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
     const unsub = onSnapshot(q, (snap) => {
       const studs: Student[] = [];
       snap.forEach((d) => studs.push({ id: d.id, ...d.data() } as Student));
-      setStudents(studs);
+      setServerStudents(studs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "students");
     });
     return () => unsub();
   }, [user, classId]);
+
+  useEffect(() => {
+    // Optimistic UI Merge
+    if (Object.keys(pendingUpdatesRef.current).length > 0) {
+      setStudents(serverStudents.map(s => {
+        if (pendingUpdatesRef.current[s.id]) {
+          return { ...s, ...pendingUpdatesRef.current[s.id] };
+        }
+        return s;
+      }));
+    } else {
+      setStudents(serverStudents);
+    }
+    // Check if any student has a seat
+    if (serverStudents.some(s => s.seatRow !== null && s.seatRow !== undefined)) {
+        setHasGrid(true);
+    }
+  }, [serverStudents]);
+
+  const queueStudentUpdate = (id: string, updates: { seatRow: number | null, seatCol: number | null }) => {
+    pendingUpdatesRef.current[id] = { ...(pendingUpdatesRef.current[id] || {}), ...updates };
+    
+    // Update local UI immediately
+    setStudents(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    setHasGrid(true);
+
+    setIsSaving(true);
+    if (debouncedSaveRef.current) clearTimeout(debouncedSaveRef.current);
+    debouncedSaveRef.current = setTimeout(async () => {
+      const batch = writeBatch(db);
+      const ids = Object.keys(pendingUpdatesRef.current);
+      if (ids.length === 0) {
+        setIsSaving(false);
+        return;
+      }
+      
+      ids.forEach(studentId => {
+         const studentRef = doc(db, "students", studentId);
+         batch.update(studentRef, pendingUpdatesRef.current[studentId]);
+      });
+      
+      pendingUpdatesRef.current = {}; 
+      
+      try {
+        await batch.commit();
+      } catch(err) {
+        handleFirestoreError(err, OperationType.UPDATE, "students_batch");
+      } finally {
+        setIsSaving(false);
+      }
+    }, 500);
+  };
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,8 +176,15 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
   };
 
   const handleGenerate = () => {
-    const plan = generateSeatingPlan(students, rows, cols);
-    setGrid(plan);
+    const updatedStudentsList = generateSeatingPlan(students, rows, cols);
+    // Queue all changes
+    updatedStudentsList.forEach(s => {
+       const original = students.find(orig => orig.id === s.id);
+       if (!original || original.seatRow !== s.seatRow || original.seatCol !== s.seatCol) {
+          queueStudentUpdate(s.id, { seatRow: s.seatRow ?? null, seatCol: s.seatCol ?? null });
+       }
+    });
+
     setFeedbackSuccess(false);
     setRating(0);
     setFeedbackComment("");
@@ -128,20 +192,34 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
 
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingStudent) return;
+    if (!editingStudent || !user) return;
     try {
-      await updateDoc(doc(db, "students", editingStudent.id), {
-        name: editingStudent.name,
-        performance: editingStudent.performance,
-        behavioralIssues: editingStudent.behavioralIssues,
-        learningType: editingStudent.learningType || "visual",
-        specialNeeds: editingStudent.specialNeeds || "",
-        wishNeighbors: editingStudent.wishNeighbors || [],
-        avoidNeighbors: editingStudent.avoidNeighbors || []
-      });
+      if (editingStudent.id === "new") {
+         await addDoc(collection(db, "students"), {
+           classId,
+           teacherId: user.uid,
+           name: editingStudent.name,
+           performance: editingStudent.performance,
+           behavioralIssues: editingStudent.behavioralIssues,
+           learningType: editingStudent.learningType || "visual",
+           specialNeeds: editingStudent.specialNeeds || "",
+           wishNeighbors: editingStudent.wishNeighbors || [],
+           avoidNeighbors: editingStudent.avoidNeighbors || []
+         });
+      } else {
+         await updateDoc(doc(db, "students", editingStudent.id), {
+           name: editingStudent.name,
+           performance: editingStudent.performance,
+           behavioralIssues: editingStudent.behavioralIssues,
+           learningType: editingStudent.learningType || "visual",
+           specialNeeds: editingStudent.specialNeeds || "",
+           wishNeighbors: editingStudent.wishNeighbors || [],
+           avoidNeighbors: editingStudent.avoidNeighbors || []
+         });
+      }
       setEditingStudent(null);
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `students/${editingStudent.id}`);
+      handleFirestoreError(err, editingStudent.id === "new" ? OperationType.CREATE : OperationType.UPDATE, `students/${editingStudent.id}`);
     }
   };
 
@@ -230,22 +308,26 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id;
+    const activeId = active.id as string;
     const targetSlotId = over.id as string; // 'slot-row-col'
 
-    const newGrid = [...grid];
-    const oldSeatIndex = newGrid.findIndex(s => s.studentId === activeId);
-    
     const parts = targetSlotId.split('-');
     const tRow = parseInt(parts[1]);
     const tCol = parseInt(parts[2]);
-    const newSeatIndex = newGrid.findIndex(s => s.row === tRow && s.col === tCol);
 
-    if (oldSeatIndex !== -1 && newSeatIndex !== -1) {
-      const temp = newGrid[oldSeatIndex].studentId;
-      newGrid[oldSeatIndex].studentId = newGrid[newSeatIndex].studentId;
-      newGrid[newSeatIndex].studentId = temp;
-      setGrid(newGrid);
+    const activeStudent = students.find(s => s.id === activeId);
+    if (!activeStudent) return;
+
+    // Is there already someone there?
+    const occupant = students.find(s => s.seatRow === tRow && s.seatCol === tCol);
+
+    if (occupant && occupant.id !== activeId) {
+      // Swap positions
+      queueStudentUpdate(occupant.id, { seatRow: activeStudent.seatRow ?? null, seatCol: activeStudent.seatCol ?? null });
+      queueStudentUpdate(activeId, { seatRow: tRow, seatCol: tCol });
+    } else {
+      // Just move to empty slot
+      queueStudentUpdate(activeId, { seatRow: tRow, seatCol: tCol });
     }
   };
 
@@ -273,36 +355,40 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
           <div>
             <h3 className="font-semibold text-slate-900 text-sm mb-3 flex items-center justify-between">
               Schülerliste
-              <span className="text-xs text-blue-500 cursor-pointer">+ Neu</span>
+              <span 
+                 className="text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded cursor-pointer transition select-none"
+                 onClick={() => setEditingStudent({
+                   id: 'new',
+                   name: '',
+                   performance: 2,
+                   behavioralIssues: false,
+                   avoidNeighbors: [],
+                   wishNeighbors: [],
+                   learningType: 'visual',
+                   specialNeeds: ''
+                 })}
+              >
+                 + Neu
+              </span>
             </h3>
 
-            <form onSubmit={handleAddStudent} className="grid gap-2 text-sm mb-4">
-              <input 
-                autoFocus
-                type="text" 
-                placeholder="Name..." 
-                value={name} 
-                onChange={e => setName(e.target.value)}
-                className="w-full border border-slate-200 rounded text-slate-900 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-              <div className="flex gap-2">
-                <select value={perf} onChange={e => setPerf(Number(e.target.value))} className="border border-slate-200 rounded px-2 py-1.5 flex-1 bg-white">
-                  <option value={1}>Schwach</option>
-                  <option value={2}>Mittel</option>
-                  <option value={3}>Stark</option>
-                </select>
-                <label className="flex items-center gap-1 border border-slate-200 rounded px-2 py-1.5 bg-slate-50 select-none cursor-pointer">
-                  <input type="checkbox" checked={bhv} onChange={e => setBhv(e.target.checked)} className="rounded text-red-500 focus:ring-red-500 w-3 h-3" />
-                  <span className="text-xs text-slate-600 font-medium">Stört</span>
-                </label>
-              </div>
-              <button type="submit" disabled={!name.trim()} className="bg-blue-50 text-blue-600 border border-blue-200 p-1.5 rounded font-semibold text-xs disabled:opacity-50 hover:bg-blue-100 transition">
-                Hinzufügen
-              </button>
-            </form>
+            <div className="mb-3">
+               <select 
+                  value={filterPerf}
+                  onChange={(e) => setFilterPerf(e.target.value === 'all' ? 'all' : Number(e.target.value) as 1|2|3)}
+                  className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:ring-1 focus:ring-blue-500 outline-none text-slate-700 bg-slate-50"
+               >
+                  <option value="all">Leistung: Alle</option>
+                  <option value="1">Nur Schwach</option>
+                  <option value="2">Nur Mittel</option>
+                  <option value="3">Nur Stark</option>
+               </select>
+            </div>
 
             <div className="space-y-2 max-h-[40vh] overflow-auto">
-              {students.map(s => (
+              {students
+                .filter(s => filterPerf === 'all' || s.performance === filterPerf)
+                .map(s => (
                 <div key={s.id} className="p-2 border border-slate-200 rounded-md flex items-center justify-between hover:border-slate-300 group transition px-3">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 bg-slate-100 rounded flex-shrink-0"></div>
@@ -340,6 +426,12 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         <div className="lg:col-span-3 bg-slate-50 p-4 lg:p-6 flex flex-col overflow-auto h-[60vh] lg:h-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 lg:mb-6">
             <div className="flex items-center gap-4">
+              {isSaving && (
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full animate-pulse transition">
+                  <div className="w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin"></div>
+                  Speichert...
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Reihen</label>
                 <input type="number" min={1} max={10} value={rows} onChange={e => setRows(Number(e.target.value))} className="w-14 min-h-[44px] sm:min-h-[auto] border border-slate-200 rounded px-2 py-1 text-center text-sm font-medium" />
@@ -355,7 +447,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
           </div>
 
           <div id="seating-chart" className="flex-1 overflow-auto bg-white border border-slate-200 rounded-xl p-4 lg:p-8 relative min-h-[300px]">
-             {grid.length === 0 ? (
+             {!hasGrid ? (
                  <div className="h-full flex flex-col items-center justify-center text-slate-400 min-h-[200px] lg:min-h-[400px]">
                      <LayoutTemplate className="w-12 h-12 lg:w-16 lg:h-16 mb-4 text-slate-200" />
                      <p className="text-sm font-medium">Klicke auf &quot;Generieren&quot; um den Plan zu berechnen.</p>
@@ -369,8 +461,10 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                           style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                       >
                           {/* Render standard Grid */}
-                          {grid.sort((a,b) => (a.row * cols + a.col) - (b.row * cols + b.col)).map((seat, i) => {
-                              const student = students.find(s => s.id === seat.studentId);
+                          {Array.from({ length: rows * cols }).map((_, i) => {
+                              const r = Math.floor(i / cols);
+                              const c = i % cols;
+                              const student = students.find(s => s.seatRow === r && s.seatCol === c);
                               let tagClass = "";
                               let tagLabel = "";
                               if (student) {
@@ -381,7 +475,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                               }
                               
                               return (
-                                  <DroppableSlot key={i} row={seat.row} col={seat.col}>
+                                  <DroppableSlot key={i} row={r} col={c}>
                                       {student ? (
                                         <DraggableStudent student={student} tagClass={tagClass} tagLabel={tagLabel} />
                                       ) : (
@@ -397,7 +491,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
           </div>
           
           {/* Feedback Section (only shown if a grid exists) */}
-          {grid.length > 0 && !feedbackSuccess && (
+          {hasGrid && !feedbackSuccess && (
             <div className="mt-6 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <h3 className="text-slate-900 font-bold mb-4">Sitzplan bewerten</h3>
               <div className="flex flex-col sm:flex-row gap-6">
@@ -505,7 +599,9 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
           <form onSubmit={handleUpdateStudent} className="bg-white rounded-xl w-full max-w-2xl shadow-xl flex flex-col border border-slate-200 overflow-hidden">
             <div className="bg-slate-50 border-b border-slate-200 p-5 flex justify-between items-center">
-              <h2 className="font-bold text-slate-900 text-lg">Schülerprofil bearbeiten: {editingStudent.name}</h2>
+              <h2 className="font-bold text-slate-900 text-lg">
+                 {editingStudent.id === 'new' ? 'Neuen Schüler hinzufügen' : `Schüler bearbeiten: ${editingStudent.name}`}
+              </h2>
               <button type="button" onClick={() => setEditingStudent(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
@@ -514,6 +610,18 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-white overflow-y-auto max-h-[70vh]">
                {/* Left Col */}
                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Name</label>
+                    <input 
+                      autoFocus
+                      required
+                      type="text" 
+                      placeholder="Name des Schülers..."
+                      value={editingStudent.name} 
+                      onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} 
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Leistung</label>
                     <select 
