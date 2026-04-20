@@ -354,7 +354,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
   };
 
   return (
-    <div className="flex flex-col gap-4 lg:gap-6 h-full p-4 lg:p-8 bg-slate-100 overflow-x-hidden w-full max-w-full">
+    <div className="flex flex-col gap-4 lg:gap-6 min-h-screen lg:h-[calc(100vh-theme(spacing.16))] h-full p-4 lg:p-8 bg-slate-100 overflow-x-hidden w-full max-w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center shrink-0 gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900 leading-tight">Sitzplan: Standard-Layout</h2>
@@ -370,10 +370,10 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 flex-1 bg-white border border-slate-200 rounded-xl shadow-sm lg:overflow-hidden min-h-0">
         
         {/* Rules/Left Panel */}
-        <div className="lg:col-span-1 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white p-4 lg:p-6 flex flex-col gap-5 h-auto lg:h-full max-h-[50vh] lg:max-h-none overflow-y-auto">
+        <div className="lg:col-span-1 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white p-4 lg:p-6 flex flex-col gap-5 h-auto lg:h-full lg:overflow-y-auto">
           <div>
             <h3 className="font-semibold text-slate-900 text-sm mb-3 flex items-center justify-between">
               Schülerliste
@@ -445,9 +445,9 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         </div>
 
         {/* Right Col: Seat Planner */}
-        <div className="lg:col-span-3 bg-slate-50 p-4 lg:p-6 flex flex-col overflow-auto h-[60vh] min-h-[500px] lg:h-full lg:min-h-0">
+        <div className="lg:col-span-3 bg-slate-50 p-4 lg:p-6 flex flex-col lg:overflow-auto h-auto lg:h-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 lg:mb-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               {isSaving && (
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full animate-pulse transition">
                   <div className="w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin"></div>
@@ -478,7 +478,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
             </div>
           </div>
 
-          <div id="seating-chart" className="flex-1 overflow-auto bg-white border border-slate-200 rounded-xl p-4 lg:p-8 relative min-h-[300px]">
+          <div id="seating-chart" className="flex-1 overflow-x-auto overflow-y-visible bg-white border border-slate-200 rounded-xl p-4 lg:p-8 relative min-h-[300px]">
              {!hasGrid ? (
                  <div className="h-full flex flex-col items-center justify-center text-slate-400 min-h-[200px] lg:min-h-[400px]">
                      <LayoutTemplate className="w-12 h-12 lg:w-16 lg:h-16 mb-4 text-slate-200" />
