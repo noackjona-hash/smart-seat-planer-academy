@@ -6,9 +6,10 @@ const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
 export async function generateAISeatingPlan(students: Student[], rows: number, cols: number): Promise<Student[]> {
   try {
     const prompt = `
-Du bist ein erfahrener Lehrer. Der Sitzplan muss auf einem Gitter von ${rows} Reihen und ${cols} Spalten aufgebaut werden (Reihenindex 0 bis ${rows - 1}, Spaltenindex 0 bis ${cols - 1}).
+Du bist ein algorithmischer Mastermind für Klassenraum-Organisation. 
+Dein Ziel ist es, die perfekte Sitzordnung in einem Gitter von ${rows} Reihen und ${cols} Spalten (Reihe 0 bis ${rows - 1}, Spalte 0 bis ${cols - 1}) zu finden.
 
-Folgende Schüler müssen platziert werden:
+Folgende Schüler (${students.length} insgesamt) müssen exakt auf die verfügbaren ${rows * cols} Plätze verteilt werden:
 ${JSON.stringify(students.map(s => ({
   id: s.id,
   name: s.name,
@@ -18,15 +19,19 @@ ${JSON.stringify(students.map(s => ({
   wishNeighbors: s.wishNeighbors
 })), null, 2)}
 
-Regeln für einen exzellenten Sitzplan:
-1. Schüler mit "behavioralIssues" (Störenfriede) sollten tendenziell weiter vorne sitzen (niedriger Reihenindex).
-2. Schüler, die in "avoidNeighbors" stehen, DÜRFEN NICHT als direkte Nachbarn (vertikal, horizontal oder diagonal = Abstand von 1) sitzen. Halte maximalen Abstand.
-3. Schüler, die in "wishNeighbors" stehen, SOLLTEN als direkte Nachbarn platziert werden, wo möglich.
-4. Setze leistungsschwache Schüler (performance=1) gerne neben leistungsstarke Schüler (performance=3), damit sie Unterstützung bekommen.
-5. Zwei Störenfriede (behavioralIssues=true) dürfen NIEMALS nebeneinander sitzen.
-6. Jeder Schüler muss einen exakten, einmaligen Sitzplatz (seatRow, seatCol) bekommen! Kein Platz darf doppelt belegt sein.
+Nutze folgendes, gewichtetes Punktesystem, um die Qualität des Sitzplans zu maximieren:
+- KRITISCH (-1000 Punkte): Ein Schüler sitzt direkt neben (horizontal, vertikal, diagonal) jemandem aus seiner "avoidNeighbors" Liste. Das darf unter keinen Umständen passieren!
+- KRITISCH (-1000 Punkte): Zwei Schüler mit "behavioralIssues=true" (Störenfriede) sitzen nebeneinander (horizontal, vertikal, diagonal).
+- KRITISCH (-1000 Punkte): Ein Platz wird doppelt belegt oder ein Schüler fehlt.
+- HOHER BONUS (+50 Punkte): Ein Schüler sitzt direkt neben jemandem aus seiner "wishNeighbors" Liste.
+- BONUS (+20 Punkte): Ein schwacher Schüler (performance=1) sitzt direkt neben einem starken Schüler (performance=3).
+- BONUS (+10 Punkte): Ein Störenfried (behavioralIssues=true) sitzt in der ersten Reihe (Reihe 0) oder zweiten Reihe (Reihe 1).
 
-Generiere den optimierten Sitzplan und gib ihn präzise im JSON Format mit der Sitzplatzstruktur zurück.
+Denkprozess (Nutze das "reasoning" Feld):
+1. Plane grobe Zuweisungen und überprüfe die Abstände (Achtung: Abstand 1 bedeutet direkte Nachbarschaft, z.B. [0,0] und [0,1] oder [1,1]).
+2. Identifiziere Konflikte für "avoidNeighbors" und "behavioralIssues" und tausche Plätze, um die -1000 Strafpunkte abzuwenden.
+3. Optimiere weiter, um "wishNeighbors" und Leistungsunterschiede zu belohnen.
+4. Gib das finale Array mit den Zuweisungen zurück.
 `;
 
     const response = await ai.models.generateContent({
@@ -35,22 +40,33 @@ Generiere den optimierten Sitzplan und gib ihn präzise im JSON Format mit der S
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              studentId: { type: Type.STRING, description: "Die ID des Schülers" },
-              seatRow: { type: Type.INTEGER, description: "Die Reihe des zugewiesenen Platzes", minimum: 0, maximum: rows - 1 },
-              seatCol: { type: Type.INTEGER, description: "Die Spalte des zugewiesenen Platzes", minimum: 0, maximum: cols - 1 }
+          type: Type.OBJECT,
+          properties: {
+            reasoning: {
+              type: Type.STRING,
+              description: "Schritt-für-Schritt Analyse der Zuweisungen, Konfliktauflösung nach dem Punktesystem und finale Score-Einschätzung."
             },
-            required: ["studentId", "seatRow", "seatCol"]
-          }
+            assignments: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  studentId: { type: Type.STRING, description: "Die ID des Schülers" },
+                  seatRow: { type: Type.INTEGER, description: "Die Reihe des zugewiesenen Platzes", minimum: 0, maximum: rows - 1 },
+                  seatCol: { type: Type.INTEGER, description: "Die Spalte des zugewiesenen Platzes", minimum: 0, maximum: cols - 1 }
+                },
+                required: ["studentId", "seatRow", "seatCol"]
+              }
+            }
+          },
+          required: ["reasoning", "assignments"]
         }
       }
     });
 
-    const text = response.text || "[]";
-    const assignments: { studentId: string, seatRow: number, seatCol: number }[] = JSON.parse(text);
+    const text = response.text || "{}";
+    const result = JSON.parse(text);
+    const assignments: { studentId: string, seatRow: number, seatCol: number }[] = result.assignments || [];
 
     const newStudents = [...students];
     for (const a of assignments) {
