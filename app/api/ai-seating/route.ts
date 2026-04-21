@@ -6,11 +6,11 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { students, rows, cols } = body;
 
-    // Use absolute backend GEMINI_API_KEY, fallback to NEXT_PUBLIC_GEMINI_API_KEY for dev preview
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    // Ensure we use the correct key format specified by guidelines
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json({ error: "Gemini API Key is not configured." }, { status: 500 });
+      return NextResponse.json({ error: "Gemini API Key is not configured (NEXT_PUBLIC_GEMINI_API_KEY missing)." }, { status: 500 });
     }
 
     const ai = new GoogleGenAI({ apiKey });

@@ -31,8 +31,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  const isFree = profile?.licenseType === "FREE";
-
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans text-slate-900">
       
@@ -76,6 +74,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <CreditCard className="w-4 h-4" />
             Lizenz & Upgrade
           </Link>
+          {user?.email === 'jona.noack@outlook.de' && (
+            <Link 
+              href="/admin"
+              className={`flex items-center gap-3 px-6 py-3 text-sm transition ${
+                pathname === "/admin" ? "bg-white/10 text-white border-r-4 border-blue-500" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Crown className="w-4 h-4" />
+              Admin Bereich
+            </Link>
+          )}
         </nav>
 
         <div className="p-4 mt-auto border-t border-slate-700/50">
@@ -128,20 +137,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        {isFree && (
-          <div className="bg-gradient-to-r from-amber-500 to-amber-400 px-4 sm:px-6 py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between shrink-0 text-white gap-2">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span className="line-clamp-2 sm:line-clamp-1">Du nutzt die FREE-Version. Werbung aktiv & Features limitiert.</span>
-            </div>
-            <Link 
-              href="/dashboard/upgrade"
-              className="text-white underline text-sm font-bold hover:text-amber-50 whitespace-nowrap"
-            >
-              Jetzt upgraden
-            </Link>
-          </div>
-        )}
         <div className="flex-1 overflow-auto overflow-x-hidden w-full relative">
           {children}
         </div>

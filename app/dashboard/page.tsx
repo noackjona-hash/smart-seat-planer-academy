@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [classes, setClasses] = useState<ClassType[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+  const [navigatingClassId, setNavigatingClassId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -128,10 +129,13 @@ export default function DashboardPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {classes.map(c => (
-            <Link 
+            <div 
               key={c.id} 
-              href={`/dashboard/classes/${c.id}`} 
-              className="group bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition block relative"
+              onClick={() => {
+                setNavigatingClassId(c.id);
+                router.push(`/dashboard/classes/${c.id}`);
+              }}
+              className="group bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition block relative cursor-pointer"
             >
               <button 
                 onClick={(e) => deleteClass(c.id, e)}
@@ -143,9 +147,16 @@ export default function DashboardPage() {
               <p className="text-slate-500 text-xs mb-6 font-medium">Sitzpläne & Schüler verwalten</p>
               
               <div className="flex items-center text-blue-600 text-sm font-semibold group-hover:gap-2 transition-all">
-                Öffnen <ArrowRight className="w-4 h-4 ml-1" />
+                {navigatingClassId === c.id ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                    Wird geladen...
+                  </div>
+                ) : (
+                  <>Öffnen <ArrowRight className="w-4 h-4 ml-1" /></>
+                )}
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

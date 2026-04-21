@@ -197,6 +197,10 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
   };
 
   const handleGenerateAI = async () => {
+    if (profile?.licenseType !== "ULTRA") {
+      alert("KI-Algorithmus ist ein ULTRA Feature! Kontaktiere deinen Administrator.");
+      return;
+    }
     setIsGeneratingAI(true);
     try {
       const updatedStudentsList = await generateAISeatingPlan(students, rows, cols);
@@ -322,8 +326,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
 
   const handleSociogram = () => {
     if (profile?.licenseType !== "ULTRA") {
-      alert("KI-Soziogramm Analyse ist ein ULTRA Feature! Bitte upgraden.");
-      router.push("/dashboard/upgrade");
+      alert("KI-Soziogramm Analyse ist ein ULTRA Feature! Kontaktiere deinen Administrator.");
       return;
     }
     setIsSociogramModalOpen(true);
@@ -405,10 +408,10 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button onClick={handleExport} className="min-h-[44px] flex-1 sm:flex-none justify-center bg-white border border-slate-200 text-slate-800 px-4 sm:px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-50 transition shadow-sm flex items-center">
-            Export PDF <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 ml-1">BASIC+</span>
+            Export PDF
           </button>
           <button onClick={handleSociogram} className="min-h-[44px] flex-1 sm:flex-none justify-center bg-indigo-500 hover:bg-indigo-600 text-white px-4 sm:px-5 py-2.5 rounded-md font-semibold text-sm flex items-center gap-2 transition shadow-sm whitespace-nowrap">
-            <BrainCircuit className="w-4 h-4" /> KI-Soziogramm <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded ml-1 tracking-wider uppercase">Ultra</span>
+            <BrainCircuit className="w-4 h-4" /> KI-Soziogramm
           </button>
         </div>
       </div>
