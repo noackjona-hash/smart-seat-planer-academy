@@ -56,12 +56,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!isAdmin) return;
     
-    const unsubCodes = onSnapshot(collection(db, "codes"), (snap) => {
+    const unsubCodes = onSnapshot(collection(db, "licenseKeys"), (snap) => {
         setCodes(snap.docs.map(d => ({id: d.id, ...d.data()})));
+    }, (error) => {
+        console.error("Error fetching codes:", error);
     });
 
     const unsubAdmins = onSnapshot(collection(db, "admins"), (snap) => {
         setAdmins(snap.docs.map(d => ({id: d.id, ...d.data()})));
+    }, (error) => {
+        console.error("Error fetching admins:", error);
     });
 
     return () => {
@@ -86,11 +90,11 @@ export default function AdminDashboard() {
       e.preventDefault();
       if (!newCodeValue.trim()) return;
       try {
-          await addDoc(collection(db, "codes"), {
-              code: newCodeValue.trim(),
+          await addDoc(collection(db, "licenseKeys"), {
+              key: newCodeValue.trim(),
               type: newCodeType, // e.g. STARTER, BASIC, ULTRA
               createdAt: new Date().toISOString(),
-              used: false
+              isUsed: false
           });
           setNewCodeValue('');
       } catch (e) {
@@ -100,7 +104,7 @@ export default function AdminDashboard() {
 
   const handleDeleteCode = async (id: string) => {
       try {
-          await deleteDoc(doc(db, "codes", id));
+          await deleteDoc(doc(db, "licenseKeys", id));
       } catch (e) {
           alert("Fehler beim Löschen des Codes.");
       }
@@ -168,11 +172,11 @@ export default function AdminDashboard() {
                     {codes.map(c => (
                         <div key={c.id} className="flex items-center justify-between p-3 border border-slate-100 rounded bg-slate-50">
                             <div>
-                                <span className="font-mono font-bold text-slate-800 mr-2">{c.code}</span>
+                                <span className="font-mono font-bold text-slate-800 mr-2">{c.key}</span>
                                 <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">{c.type}</span>
-                                {c.used && <span className="text-xs text-red-500 ml-2">Benutzt</span>}
+                                {c.isUsed && <span className="text-xs text-red-500 ml-2">Benutzt</span>}
                             </div>
-                            <button onClick={() => handleDeleteCode(c.id)} className="text-red-500 hover:text-red-700 text-sm font-bold">Inaktivieren</button>
+                            <button onClick={() => handleDeleteCode(c.id)} className="text-red-500 hover:text-red-700 text-sm font-bold">Löschen</button>
                         </div>
                     ))}
                     {codes.length === 0 && <p className="text-slate-400 text-sm">Keine Codes vorhanden.</p>}

@@ -1,5 +1,20 @@
 {
   "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "An admin that can create rules",
+      "type": "object",
+      "properties": {
+        "addedBy": {
+          "type": "string"
+        },
+        "addedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["addedBy", "addedAt"]
+    },
     "User": {
       "title": "User",
       "description": "A teacher using the Smart Seat Planer",
@@ -146,6 +161,12 @@
     }
   },
   "firestore": {
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "Admin"
+      },
+      "description": "Admins mapping via email"
+    },
     "/users/{userId}": {
       "schema": {
         "$ref": "User"
