@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use, useRef } from "react";
+import { useEffect, useState, use, useRef, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/firebase";
 import { collection, query, where, addDoc, onSnapshot, deleteDoc, doc, updateDoc, writeBatch } from "firebase/firestore";
@@ -114,7 +114,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
     }
   }, [serverStudents]);
 
-  const queueStudentUpdate = (id: string, updates: { seatRow: number | null, seatCol: number | null }) => {
+  const queueStudentUpdate = useCallback((id: string, updates: { seatRow: number | null, seatCol: number | null }) => {
     pendingUpdatesRef.current[id] = { ...(pendingUpdatesRef.current[id] || {}), ...updates };
     
     // Update local UI immediately
@@ -146,7 +146,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         setIsSaving(false);
       }
     }, 500);
-  };
+  }, []);
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,6 +277,47 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
   const [isSociogramModalOpen, setIsSociogramModalOpen] = useState(false);
   const [isAnalyzingSociogram, setIsAnalyzingSociogram] = useState(false);
 
+  // Dynamic Sociogram Data
+  const sociogramAnalysis = useMemo(() => {
+    const seated = students.filter(s => 
+      s.seatRow !== null && s.seatCol !== null && 
+      s.seatRow !== undefined && s.seatCol !== undefined && 
+      s.seatRow < rows && s.seatCol < cols
+    );
+    if (seated.length === 0) return null;
+
+    const disrupters = seated.filter(s => s.behavioralIssues);
+    const strong = seated.filter(s => s.performance === 3);
+    const weak = seated.filter(s => s.performance === 1);
+
+    return {
+      groupDynamics: disrupters.length > 0 
+        ? "Mischung aus unterschiedlichen Dynamiken. Fokus-Schüler sind im Raum präsent." 
+        : "Die Gruppendynamik wirkt harmonisch und fokussiert.",
+      conflict: disrupters.length > 0 
+        ? `Reihe ${disrupters[0].seatRow! + 1} erfordert erhöhte Aufmerksamkeit durch ${disrupters[0].name}.`
+        : "Keine offensichtlichen Unruheherde in der aktuellen Konstellation.",
+      tip: strong.length > 0 
+        ? `Setze ${strong[0].name} gezielt zur Unterstützung schwächerer Mitschüler in der Nähe ein.`
+        : "Versuche, leistungsstarke Schüler als Ankerpunkte im Raum zu verteilen."
+    };
+  }, [students, rows, cols]);
+
+  useEffect(() => {
+    // Unseat students that are outside the current grid boundaries
+    const cutOffStudents = students.filter(s => 
+      s.seatRow !== null && s.seatCol !== null && 
+      s.seatRow !== undefined && s.seatCol !== undefined &&
+      (s.seatRow >= rows || s.seatCol >= cols)
+    );
+    
+    if (cutOffStudents.length > 0) {
+      cutOffStudents.forEach(s => {
+        queueStudentUpdate(s.id, { seatRow: null, seatCol: null });
+      });
+    }
+  }, [rows, cols, students, queueStudentUpdate]);
+
   const handleSociogram = () => {
     if (profile?.licenseType !== "ULTRA") {
       alert("KI-Soziogramm Analyse ist ein ULTRA Feature! Bitte upgraden.");
@@ -380,11 +421,11 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
               {students
                 .filter(s => filterPerf === 'all' || s.performance === filterPerf)
                 .map(s => (
-                <div key={s.id} className="p-2 border border-slate-200 rounded-md flex items-center justify-between hover:border-slate-300 group transition px-3">
+                <div key={s.id} className={`p-2 border rounded-md flex items-center justify-between transition px-3 ${s.seatRow !== null ? 'bg-blue-50/30 border-blue-100' : 'bg-white border-slate-200 hover:border-slate-300 group'}`}>
                   <div className="flex items-center gap-3 w-full overflow-hidden">
-                    <div className="w-3 h-3 bg-slate-100 rounded flex-shrink-0"></div>
+                    <div className={`w-3 h-3 rounded flex-shrink-0 transition-colors ${s.seatRow !== null ? 'bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.3)]' : 'bg-slate-200'}`}></div>
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-slate-800 text-xs truncate">{s.name}</div>
+                      <div className={`font-semibold text-xs truncate ${s.seatRow !== null ? 'text-blue-900' : 'text-slate-800'}`}>{s.name}</div>
                       <div className="text-[0.65rem] text-slate-500 mt-0.5 truncate">
                         {s.performance === 3 ? "Stark" : s.performance === 1 ? "Schwach" : "Neutral"}
                         {s.behavioralIssues && " | Stört"}
@@ -555,14 +596,18 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                      <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
                      <p className="font-semibold text-slate-700">Analysiere Sitzplan und Konstellationen...</p>
                    </div>
-                ) : (
+                ) : sociogramAnalysis ? (
                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-left">
                       <h3 className="font-bold text-slate-800 border-b pb-2 mb-3">Ergebnis der Auswertung</h3>
-                      <p className="text-sm text-slate-600 mb-2">✅ <strong className="text-slate-800">Gruppendynamik:</strong> Sehr ausgewogen. Störenfriede sind gut verteilt.</p>
-                      <p className="text-sm text-slate-600 mb-2">⚠️ <strong className="text-slate-800">Potenzieller Konflikt:</strong> Reihe 3 könnte unruhig werden.</p>
-                      <p className="text-sm text-slate-600 mb-4">💡 <strong className="text-slate-800">Tipp:</strong> Setze Anna P. weiter nach vorne zur Unterstützung.</p>
-                      <div className="p-3 bg-indigo-50 text-indigo-800 text-xs rounded-lg font-medium">Diese Funktion lernt aus dem Feedback der Lehrkraft und verfeinert sich.</div>
+                      <p className="text-sm text-slate-600 mb-2">✅ <strong className="text-slate-800">Gruppendynamik:</strong> {sociogramAnalysis.groupDynamics}</p>
+                      <p className="text-sm text-slate-600 mb-2">⚠️ <strong className="text-slate-800">Potenzieller Konflikt:</strong> {sociogramAnalysis.conflict}</p>
+                      <p className="text-sm text-slate-600 mb-4">💡 <strong className="text-slate-800">Tipp:</strong> {sociogramAnalysis.tip}</p>
+                      <div className="p-3 bg-indigo-50 text-indigo-800 text-xs rounded-lg font-medium">Diese Analyse basiert auf den hinterlegten Schülerprofilen und deren aktueller Platzierung im Raum.</div>
                    </div>
+                ) : (
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center py-10">
+                    <p className="text-slate-400 text-sm italic">Platziere zuerst Schüler im Sitzplan, um eine Analyse zu erhalten.</p>
+                  </div>
                 )}
                 
                 <button
@@ -646,13 +691,12 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                {/* Right Col */}
                <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Besondere Bedürfnisse</label>
-                    <input 
-                      type="text" 
-                      placeholder="z.B. ADHS, Sehschwäche, Rollstuhl"
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Spezielle Bedürfnisse</label>
+                    <textarea 
+                      placeholder="z.B. LRS, Sehschwäche, Rollstuhlzugang (optional)..."
                       value={editingStudent.specialNeeds || ""} 
                       onChange={e => setEditingStudent({...editingStudent, specialNeeds: e.target.value})} 
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm"
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none min-h-[80px] resize-none"
                     />
                   </div>
                   
