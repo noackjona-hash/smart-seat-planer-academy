@@ -193,6 +193,14 @@ export default function LandingPage() {
           </div>
         </div>
       </main>
+      
+      <footer className="w-full bg-slate-900 border-t border-slate-800 text-slate-400 py-8 px-4 text-center text-sm relative z-10 bottom-0 mt-auto">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-center items-center gap-6">
+          <span>&copy; {new Date().getFullYear()} Smart Seat Planer</span>
+          <a href="/impressum" className="hover:text-white transition">Impressum</a>
+          <a href="/datenschutz" className="hover:text-white transition">Datenschutz</a>
+        </div>
+      </footer>
     </div>
   );
 }

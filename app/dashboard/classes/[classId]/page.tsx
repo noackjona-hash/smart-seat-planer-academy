@@ -12,14 +12,14 @@ import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchS
 import { CSS } from '@dnd-kit/utilities';
 import { generateAISeatingPlan } from "@/lib/aiSeating";
 
-function DroppableSlot({ row, col, children }: { row: number, col: number, children: React.ReactNode }) {
+function DroppableSlot({ row, col, children, onClick }: { row: number, col: number, children: React.ReactNode, onClick?: () => void }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `slot-${row}-${col}`,
   });
   const { active } = useDndContext();
   const isDragging = active !== null;
   return (
-    <div ref={setNodeRef} className={`relative z-10 aspect-video rounded-lg p-1 sm:p-2 flex flex-col items-center justify-center gap-1 text-center transition-all ${isOver ? 'ring-2 ring-blue-500 bg-blue-100 border-solid border-blue-500 scale-105 shadow-md' : isDragging ? 'bg-white border text-transparent border-blue-200 border-dashed shadow-inner' : 'bg-slate-50 border border-slate-200 border-dashed'}`}>
+    <div ref={setNodeRef} onClick={onClick} className={`relative z-10 aspect-video rounded-lg p-1 sm:p-2 flex flex-col items-center justify-center gap-1 text-center transition-all ${isOver ? 'ring-2 ring-blue-500 bg-blue-100 border-solid border-blue-500 scale-105 shadow-md' : isDragging ? 'bg-white border text-transparent border-blue-200 border-dashed shadow-inner' : 'bg-slate-50 border border-slate-200 border-dashed cursor-pointer hover:border-slate-300'}`}>
       {children}
     </div>
   );
@@ -43,7 +43,7 @@ function DraggableStudent({ student, tagClass, tagLabel }: { student: Student, t
       className={`absolute inset-1 flex flex-col items-center justify-center rounded shadow-sm touch-none cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-90 ring-2 ring-blue-500 scale-105 shadow-xl' : ''} ${student.behavioralIssues ? 'bg-slate-100 border-2 border-red-500' : 'bg-slate-100 border border-slate-200'}`}
     >
       <span className="font-semibold text-[0.6rem] sm:text-xs text-slate-900 leading-tight truncate px-1 w-full">{student.name}</span>
-      <span className={`text-[0.5rem] sm:text-[0.6rem] px-1 py-0.5 rounded-full font-medium truncate max-w-[90%] ${tagClass}`}>{tagLabel}</span>
+      <span className={`pdf-exclude text-[0.5rem] sm:text-[0.6rem] px-1 py-0.5 rounded-full font-medium truncate max-w-[90%] ${tagClass}`}>{tagLabel}</span>
     </div>
   )
 }
@@ -82,6 +82,8 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'LIST' | 'GRID'>('LIST');
+  const [tapSelectedStudentId, setTapSelectedStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -363,6 +365,37 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
     }
   };
 
+  const handleTapStudent = (id: string) => {
+    if(tapSelectedStudentId === id) setTapSelectedStudentId(null);
+    else {
+      setTapSelectedStudentId(id);
+      setMobileTab('GRID');
+    }
+  };
+
+  const handleTapSlot = (r: number, c: number) => {
+    if (!tapSelectedStudentId) {
+      const occupant = students.find(s => s.seatRow === r && s.seatCol === c);
+      if (occupant) {
+        setTapSelectedStudentId(occupant.id);
+      }
+      return;
+    }
+
+    const tRow = r;
+    const tCol = c;
+    const activeId = tapSelectedStudentId;
+    const activeStudent = students.find(s => s.id === activeId);
+    if (!activeStudent) return;
+    
+    const occupant = students.find(s => s.seatRow === tRow && s.seatCol === tCol);
+    if (occupant && occupant.id !== activeId) {
+      queueStudentUpdate(occupant.id, { seatRow: activeStudent.seatRow ?? null, seatCol: activeStudent.seatCol ?? null });
+    }
+    queueStudentUpdate(activeId, { seatRow: tRow, seatCol: tCol });
+    setTapSelectedStudentId(null);
+  };
+
   return (
     <div className="flex flex-col gap-4 lg:gap-6 min-h-screen lg:h-[calc(100vh-theme(spacing.16))] h-full p-4 lg:p-8 bg-slate-100 overflow-x-hidden w-full max-w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center shrink-0 gap-4">
@@ -380,10 +413,24 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         </div>
       </div>
 
+      <div className="lg:hidden flex border border-slate-200 rounded-md overflow-hidden bg-white mb-4 shadow-sm">
+          <button 
+             onClick={() => setMobileTab('LIST')} 
+             className={`flex-1 py-3 text-sm font-bold text-center ${mobileTab === 'LIST' ? 'bg-slate-800 text-white' : 'text-slate-600 bg-slate-50'}`}
+          >Schülerliste</button>
+          <button 
+             onClick={() => setMobileTab('GRID')} 
+             className={`flex-1 py-3 text-sm font-bold text-center flex flex-col items-center gap-0.5 justify-center ${mobileTab === 'GRID' ? 'bg-slate-800 text-white' : 'text-slate-600 bg-slate-50'}`}
+          >
+             Sitzplan 
+             {tapSelectedStudentId && <span className="text-[10px] bg-blue-500 text-white px-1.5 rounded-full animate-pulse">Platz wählen</span>}
+          </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 flex-1 bg-white border border-slate-200 rounded-xl shadow-sm lg:overflow-hidden min-h-0">
         
         {/* Rules/Left Panel */}
-        <div className="lg:col-span-1 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white p-4 lg:p-6 flex flex-col gap-5 h-auto lg:h-full max-h-[45vh] lg:max-h-none overflow-y-auto">
+        <div className={`lg:col-span-1 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white p-4 lg:p-6 flex-col gap-5 h-auto lg:h-full lg:max-h-none overflow-y-auto ${mobileTab === 'LIST' ? 'flex' : 'hidden lg:flex'}`}>
           <div>
             <h3 className="font-semibold text-slate-900 text-sm mb-3 flex items-center justify-between">
               Schülerliste
@@ -421,7 +468,14 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
               {students
                 .filter(s => filterPerf === 'all' || s.performance === filterPerf)
                 .map(s => (
-                <div key={s.id} className={`p-2 border rounded-md flex items-center justify-between transition px-3 ${s.seatRow !== null ? 'bg-blue-50/30 border-blue-100' : 'bg-white border-slate-200 hover:border-slate-300 group'}`}>
+                <div 
+                  key={s.id} 
+                  onClick={() => handleTapStudent(s.id)}
+                  className={`p-2 border rounded-md flex items-center justify-between transition px-3 cursor-pointer ${
+                    tapSelectedStudentId === s.id ? 'bg-indigo-100 border-indigo-500 ring-2 ring-indigo-500' :
+                    s.seatRow !== null ? 'bg-blue-50/30 border-blue-100' : 'bg-white border-slate-200 hover:border-slate-300 group'
+                  }`}
+                >
                   <div className="flex items-center gap-3 w-full overflow-hidden">
                     <div className={`w-3 h-3 rounded flex-shrink-0 transition-colors ${s.seatRow !== null ? 'bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.3)]' : 'bg-slate-200'}`}></div>
                     <div className="min-w-0 flex-1">
@@ -455,7 +509,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         </div>
 
         {/* Right Col: Seat Planner */}
-        <div className="lg:col-span-3 bg-slate-50 p-4 lg:p-6 flex flex-col lg:overflow-auto h-auto lg:h-full">
+        <div className={`lg:col-span-3 bg-slate-50 p-4 lg:p-6 flex-col lg:overflow-auto h-auto lg:h-full ${mobileTab === 'GRID' ? 'flex' : 'hidden lg:flex'}`}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 lg:mb-6">
             <div className="flex items-center gap-4 flex-wrap">
               {isSaving && (
@@ -517,7 +571,7 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
                               }
                               
                               return (
-                                  <DroppableSlot key={i} row={r} col={c}>
+                              <DroppableSlot key={i} row={r} col={c} onClick={() => handleTapSlot(r, c)}>
                                       {student ? (
                                         <DraggableStudent student={student} tagClass={tagClass} tagLabel={tagLabel} />
                                       ) : (

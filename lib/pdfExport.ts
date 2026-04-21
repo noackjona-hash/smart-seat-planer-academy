@@ -20,6 +20,16 @@ export const exportToPDF = async (elementId: string, filename: string) => {
     const imgData = await htmlToImage.toPng(element, { 
       backgroundColor: "#ffffff",
       pixelRatio: 2,
+      filter: (node) => {
+        // HTMLElement has classList, but we have to cast since node is Node type
+        if (node.nodeType === 1) {
+          const el = node as HTMLElement;
+          if (el.classList && el.classList.contains('pdf-exclude')) {
+            return false;
+          }
+        }
+        return true;
+      }
     });
     
     // Restore original styles
