@@ -326,7 +326,8 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
 
   const handleSociogram = () => {
     if (profile?.licenseType !== "ULTRA") {
-      alert("KI-Soziogramm Analyse ist ein ULTRA Feature! Kontaktiere deinen Administrator.");
+      alert("KI-Soziogramm Analyse ist ein ULTRA Feature! Bitte upgraden.");
+      router.push("/dashboard/upgrade");
       return;
     }
     setIsSociogramModalOpen(true);
@@ -409,6 +410,15 @@ export default function ClassDetails({ params }: { params: Promise<{ classId: st
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button onClick={handleExport} className="min-h-[44px] flex-1 sm:flex-none justify-center bg-white border border-slate-200 text-slate-800 px-4 sm:px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-50 transition shadow-sm flex items-center">
             Export PDF
+          </button>
+          <button onClick={() => {
+            if (profile?.licenseType !== "ULTRA") {
+              alert("Smart-Groups ist ein ULTRA Feature! Kontaktiere deinen Administrator.");
+              return;
+            }
+            alert("Die ULTRA Smart-Groups Funktion generiert demnächst automatisch Paare...");
+          }} className="min-h-[44px] flex-1 sm:flex-none justify-center bg-amber-500 hover:bg-amber-600 text-white px-4 sm:px-5 py-2.5 rounded-md font-semibold text-sm flex items-center gap-2 transition shadow-sm whitespace-nowrap">
+            <Users className="w-4 h-4" /> Smart-Groups
           </button>
           <button onClick={handleSociogram} className="min-h-[44px] flex-1 sm:flex-none justify-center bg-indigo-500 hover:bg-indigo-600 text-white px-4 sm:px-5 py-2.5 rounded-md font-semibold text-sm flex items-center gap-2 transition shadow-sm whitespace-nowrap">
             <BrainCircuit className="w-4 h-4" /> KI-Soziogramm

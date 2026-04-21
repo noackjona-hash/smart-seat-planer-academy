@@ -31,8 +31,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const isFree = profile?.licenseType === "FREE";
+
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans text-slate-900">
+    <div className="flex h-screen w-full bg-slate-100 overflow-hidden font-sans text-slate-900 flex-row">
       
       {/* Mobile Menu Backdrop */}
       {mobileMenuOpen && (
@@ -44,7 +46,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 w-64 bg-slate-800 text-white flex flex-col shrink-0 z-50 transform transition-transform duration-300 ease-in-out lg:transform-none ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-20 flex items-center justify-between px-6">
+        <div className="h-16 flex items-center justify-between px-6 shrink-0 border-b border-slate-700/50">
           <span className="font-extrabold text-xl tracking-tight text-white flex items-center gap-2">
             Smart<span className="text-blue-500">Seat</span>
           </span>
@@ -53,41 +55,44 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </button>
         </div>
         
-        <div className="text-[0.65rem] uppercase tracking-wider px-6 py-2 text-slate-500 font-semibold mt-4">Klassen</div>
-        <nav className="flex-1 space-y-0.5 mt-1">
-          <Link 
-            href="/dashboard"
-            className={`flex items-center gap-3 px-6 py-3 text-sm transition ${
-              pathname === "/dashboard" ? "bg-white/10 text-white border-r-4 border-blue-500" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Schülerlisten & Pläne
-          </Link>
-          <div className="text-[0.65rem] uppercase tracking-wider px-6 py-2 text-slate-500 font-semibold mt-6">Einstellungen</div>
-          <Link 
-            href="/dashboard/upgrade"
-            className={`flex items-center gap-3 px-6 py-3 text-sm transition ${
-              pathname === "/dashboard/upgrade" ? "bg-white/10 text-white border-r-4 border-blue-500" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            Lizenz & Upgrade
-          </Link>
-          {user?.email === 'jona.noack@outlook.de' && (
+        <div className="overflow-y-auto flex-1 pb-4">
+          <div className="text-[0.65rem] uppercase tracking-wider px-6 py-2 text-slate-500 font-semibold mt-4">Klassen</div>
+          <nav className="space-y-0.5 mt-1">
             <Link 
-              href="/admin"
+              href="/dashboard"
               className={`flex items-center gap-3 px-6 py-3 text-sm transition ${
-                pathname === "/admin" ? "bg-white/10 text-white border-r-4 border-blue-500" : "text-slate-400 hover:text-white"
+                pathname === "/dashboard" ? "bg-white/10 text-white border-r-4 border-blue-500" : "text-slate-400 hover:text-white"
               }`}
             >
-              <Crown className="w-4 h-4" />
-              Admin Bereich
+              <Users className="w-4 h-4" />
+              Schülerlisten & Pläne
             </Link>
-          )}
-        </nav>
+            <div className="text-[0.65rem] uppercase tracking-wider px-6 py-2 text-slate-500 font-semibold mt-6">Einstellungen</div>
+            <Link 
+              href="/dashboard/upgrade"
+              className={`flex items-center gap-3 px-6 py-3 text-sm transition ${
+                pathname === "/dashboard/upgrade" ? "bg-white/10 text-white border-r-4 border-blue-500" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              Lizenz & Upgrade
+            </Link>
 
-        <div className="p-4 mt-auto border-t border-slate-700/50">
+            {user?.email === 'jona.noack@outlook.de' && (
+              <Link 
+                href="/admin"
+                className={`flex items-center gap-3 px-6 py-3 text-sm transition ${
+                  pathname === "/admin" ? "bg-white/10 text-white border-r-4 border-blue-500" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Crown className="w-4 h-4" />
+                Admin Bereich
+              </Link>
+            )}
+          </nav>
+        </div>
+
+        <div className="p-4 mt-auto border-t border-slate-700/50 shrink-0">
           <div className="bg-slate-900 rounded-lg p-3 mb-3 text-xs">
              <div className="flex items-center gap-2 mb-1">
                 Aktueller Plan:
